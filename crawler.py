@@ -1,10 +1,7 @@
 import json
 import os
-from collections import deque
 from re import findall
-from time import time, sleep
-from util import randselect, byteify, file_to_list
-import csv
+from time import sleep
 
 def crawl(api, hashtag, config):
 	# print('Crawling started at origin hashtag', origin['user']['username'], 'with ID', origin['user']['pk'])
@@ -49,6 +46,21 @@ def visit_profile(api, hashtag, config):
 		else:
 			return True
 
+def get_comments(api, id, no_of_comments):
+	all_comments = []
+	comments = api.media_comments(id, count=min(no_of_comments, 20))
+	all_comments.extend([extract_relevant_from_comments(comment) for comment in comments["comments"]])
+	return all_comments
+
+
+
+def extract_relevant_from_comments(j):
+	result = {
+		"name": j["user"]["username"],
+		"full_name": j["user"]["full_name"],
+		"text": j["text"]
+	}
+	return result
 def beautify_post(api, post, profile_dic):
 	try:
 		if post['media_type'] != 1: # If post is not a single image media
@@ -57,6 +69,9 @@ def beautify_post(api, post, profile_dic):
 		# print(post)
 		user_id = post['user']['pk']
 		profile = profile_dic.get(user_id, False)
+
+		profile = profile_dic.get(user_id, False)
+		comments = get_comments(api, post["id"], post["comment_count"])
 		while True:
 			try:
 				sleep(0.05)
@@ -85,7 +100,8 @@ def beautify_post(api, post, profile_dic):
 			'pic_url' : post['image_versions2']['candidates'][0]['url'],
 			'like_count' : post['like_count'] if 'like_count' in keys else 0,
 			'comment_count' : post['comment_count'] if 'comment_count' in keys else 0,
-			'caption' : post['caption']['text'] if 'caption' in keys and post['caption'] is not None else ''
+			'caption' : post['caption']['text'] if 'caption' in keys and post['caption'] is not None else '',
+			'comments': comments
 		}
 		processed_media['tags'] = findall(r'#[^#\s]*', processed_media['caption'])
 		# print(processed_media['tags'])

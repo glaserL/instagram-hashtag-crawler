@@ -4,13 +4,8 @@
 # @Created:   2017-05-21 12:30:29  seo (simon.seo@nyu.edu) 
 # @Updated:   2017-05-21 13:41:42  Simon Seo (simon.seo@nyu.edu)
 
-import json
 import os.path
 import argparse
-import multiprocessing as mp
-import csv
-from time import time
-from collections import deque
 from util import file_to_list
 from crawler import crawl
 import pathlib
