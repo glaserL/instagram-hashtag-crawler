@@ -18,23 +18,55 @@ def wait(mu, sigma=3.0):
     return decorator
 
 
+class ProfileDict:
+    def save(self):
+        with open(self.path, encoding="utf-8") as f:
+            json.dump(self._dict, f, ensure_ascii=False)
+
+    def __init__(self, path, api):
+        self.path = path
+        self.api = api
+        with open(path, encoding="utf-8") as f:
+            self._dict = json.load(f)
+
+    def get(self, user_id):
+        if user_id in self._dict.keys():
+            return self._dict[user_id]
+        else:
+            user = self.get_profile_from_instagram(user_id)
+            self.add(user)
+            return user
+
+    def add(self, user_dict):
+        user_name = user_dict.get('user', {}).get("username", "")
+        self._dict[user_name] = user_dict
+        self.save()
+
+    @wait(0.5, .5)
+    def get_profile_from_instagram(self, user_id):
+        result = self.api.user_info(user_id)
+        user_name = result.get('user', {}).get("username", "")
+        print(f"Got profile for {user_name}.")
+        return result
+
+
 def crawl(api, hashtag, config):
-    # print('Crawling started at origin hashtag', origin['user']['username'], 'with ID', origin['user']['pk'])
-    if visit_profile(api, hashtag, config):
+    profiles = ProfileDict("profiles.json", api)
+
+    if visit_profile(api, hashtag, config, profiles):
         pass
 
 
-def visit_profile(api, hashtag, config):
+def visit_profile(api, hashtag, config, profiles):
     while True:
         try:
             processed_tagfeed = {
                 'posts': []
             }
-            feed = get_posts(api, hashtag, config)[:5]
+            feed = get_posts(api, hashtag, config)
             with open(config['profile_path'] + os.sep + str(hashtag) + '_rawfeed.json', 'w') as outfile:
                 json.dump(feed, outfile, indent=2)
-            profile_dic = {}
-            posts = [beautify_post(api, post, profile_dic) for post in feed]
+            posts = [beautify_post(api, post, profiles) for post in feed]
             posts = list(filter(lambda x: not x is None, posts))
             if len(posts) < config['min_collect_media']:
                 return False
@@ -78,26 +110,15 @@ def extract_relevant_from_comments(j):
     }
     return result
 
-
-@wait(0.5, .5)
-def get_profile(api, user_id):
-    result = api.user_info(user_id)
-    user_name = result.get('user', {}).get("username", "")
-    print(f"Got profile for {user_name}.")
-    return result
-
-def beautify_post(api, post, profile_dic):
+def beautify_post(api, post, profiles):
     try:
         if post['media_type'] != 1:  # If post is not a single image media
             return None
         keys = post.keys()
         # print(post)
         user_id = post['user']['pk']
-        profile = profile_dic.get(user_id, False)
         comments = get_comments(api, post["id"], post["comment_count"])
-        if profile is False:
-            profile = get_profile(api, user_id)
-            profile_dic[user_id] = profile
+        profile = profiles.get(user_id)
 
         processed_media = {
             'user_id': user_id,
@@ -146,38 +167,3 @@ def get_posts(api, hashtag, config):
             break
     print(f"Collected {len(feed)} posts for hashtag {hashtag}")
     return feed
-
-#
-# def get_posts(api, hashtag, config):
-# 	try:
-# 		feed = []
-# 		try:
-# 			uuid = api.generate_uuid(return_hex=False, seed='0')
-# 			results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
-# 		except Exception as e:
-# 			print('exception while getting feed1')
-# 			raise e
-# 		feed.extend(results.get('items', []))
-#
-# 		if config['min_timestamp'] is not None: return feed
-#
-# 		next_max_id = results.get('next_max_id')
-# 		while next_max_id and len(feed) < config['max_collect_media']:
-# 			print("next_max_id", next_max_id, "len(feed) < max_collect_media", len(feed) < config['max_collect_media'] , len(feed))
-# 			try:
-# 				results = api.feed_tag(hashtag, rank_token=uuid, max_id=next_max_id)
-# 			except Exception as e:
-# 				print('exception while getting feed2')
-# 				if str(e) == 'Bad Request: Please wait a few minutes before you try again.':
-# 					sleep(60)
-# 				else:
-# 					raise e
-# 			feed.extend(results.get('items', []))
-# 			next_max_id = results.get('next_max_id')
-#
-# 		return feed
-#
-# 	except Exception as e:
-# 		print('exception while getting posts')
-# 		raise e
-#
