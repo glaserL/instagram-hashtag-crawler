@@ -143,6 +143,7 @@ def beautify_post(api, post, profiles):
         raise e
 
 
+@wait(8.0)
 def request_posts_from_instagram(api, hashtag, rank_token, max_id=None):
     if max_id is None:
         results = api.feed_tag(hashtag, rank_token=rank_token)
