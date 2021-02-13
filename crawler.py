@@ -2,6 +2,7 @@ import json
 import os
 from re import findall
 from time import sleep
+import os
 from random import gauss
 
 
@@ -20,14 +21,17 @@ def wait(mu, sigma=3.0):
 
 class ProfileDict:
     def save(self):
-        with open(self.path, encoding="utf-8") as f:
+        with open(self.path, "w", encoding="utf-8") as f:
             json.dump(self._dict, f, ensure_ascii=False)
 
     def __init__(self, path, api):
         self.path = path
         self.api = api
-        with open(path, encoding="utf-8") as f:
-            self._dict = json.load(f)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                self._dict = json.load(f)
+        else:
+            self._dict = {}
 
     def get(self, user_id):
         if user_id in self._dict.keys():
