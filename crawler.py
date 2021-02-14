@@ -4,7 +4,7 @@ from re import findall
 from time import sleep
 import os
 from random import gauss
-
+from tqdm import tqdm
 
 def wait(mu, sigma=3.0):
     def decorator(func):
@@ -22,7 +22,7 @@ def wait(mu, sigma=3.0):
 class ProfileDict:
     def save(self):
         with open(self.path, "w", encoding="utf-8") as f:
-            json.dump(self._dict, f, ensure_ascii=False)
+            json.dump(self._dict, f, indent=2, ensure_ascii=False)
 
     def __init__(self, path, api):
         self.path = path
@@ -30,27 +30,28 @@ class ProfileDict:
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:
                 self._dict = json.load(f)
+                print(f"Loaded {len(self._dict)} users from disk.")
         else:
             self._dict = {}
 
     def get(self, user_id):
-        if user_id in self._dict.keys():
-            return self._dict[user_id]
+        if str(user_id) in self._dict.keys():
+            return self._dict[str(user_id)]
+        elif int(user_id) in self._dict.keys():
+            return self._dict[int(user_id)]
+
         else:
             user = self.get_profile_from_instagram(user_id)
-            self.add(user)
+            self.add(user_id, user)
             return user
 
-    def add(self, user_dict):
-        user_name = user_dict.get('user', {}).get("username", "")
-        self._dict[user_name] = user_dict
+    def add(self, user_id, user_dict):
+        self._dict[user_id] = user_dict
         self.save()
 
-    @wait(0.5, .5)
+    @wait(8, 4)
     def get_profile_from_instagram(self, user_id):
         result = self.api.user_info(user_id)
-        user_name = result.get('user', {}).get("username", "")
-        print(f"Got profile for {user_name}.")
         return result
 
 
@@ -59,6 +60,30 @@ def crawl(api, hashtag, config):
 
     if visit_profile(api, hashtag, config, profiles):
         pass
+
+
+def add_comments(api, posts, config):
+    for post in tqdm(posts):
+        user_id = post['user']['pk']
+        try :
+            if post["comment_count"] > 0:
+                comments = get_comments(api, post["id"], post["comment_count"])
+            else:
+                comments = []
+            post["comments"] = comments
+            if post["comment_count"] > 0:
+                break
+        except Exception as e:
+            print(f"Failed to get comments. {e}")
+            break
+    return posts
+
+
+def crawl_users(api, user_ids, target_path_for_profiles, config):
+    profiles = ProfileDict(target_path_for_profiles, api)
+    for user_ids in tqdm(user_ids):
+        _ = profiles.get(user_ids)
+    return profiles
 
 
 def visit_profile(api, hashtag, config, profiles):
@@ -102,7 +127,7 @@ def visit_profile(api, hashtag, config, profiles):
 def get_comments(api, id, no_of_comments):
     all_comments = []
     comments = api.media_comments(id, count=min(no_of_comments, 20))
-    all_comments.extend([extract_relevant_from_comments(comment) for comment in comments["comments"]])
+    all_comments.extend([comment for comment in comments["comments"]])
     return all_comments
 
 
