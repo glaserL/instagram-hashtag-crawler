@@ -6,6 +6,7 @@ import os
 from random import gauss
 from tqdm import tqdm
 
+
 def wait(mu, sigma=3.0):
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -65,7 +66,7 @@ def crawl(api, hashtag, config):
 def add_comments(api, posts, config):
     for post in tqdm(posts):
         user_id = post['user']['pk']
-        try :
+        try:
             if post["comment_count"] > 0:
                 comments = get_comments(api, post["id"], post["comment_count"])
             else:
@@ -139,6 +140,7 @@ def extract_relevant_from_comments(j):
     }
     return result
 
+
 def beautify_post(api, post, profiles):
     try:
         if post['media_type'] != 1:  # If post is not a single image media
@@ -180,6 +182,28 @@ def request_posts_from_instagram(api, hashtag, rank_token, max_id=None):
         results = api.feed_tag(hashtag, rank_token=rank_token, max_id=max_id)
     print(f"Successfully requested {len(results.get('items', ''))} more for {hashtag} ({max_id})..")
     return results
+
+
+@wait(7.5, 2.0)
+def request_likers(api, post_id, count):
+    return api.media_likers(post_id, count=count)
+
+
+def add_likers(api, raw_data, config):
+    for post in raw_data:
+        try:
+            like_count = post["like_count"]
+            likers = post.get("likers", [])
+            if like_count > 0 and len(likers) < like_count:
+                num_of_likers_to_get = min(50, post["like_count"])
+                new_likers = request_likers(api, post["id"], num_of_likers_to_get)
+                likers.extend(new_likers)
+            likers = list(set(likers))
+            post["likers"] = likers
+        except Exception as e:
+            print(e)
+            break
+    return raw_data
 
 
 def get_posts(api, hashtag, config):

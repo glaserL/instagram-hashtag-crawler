@@ -11,7 +11,7 @@ from time import sleep
 import sys
 import json
 from util import file_to_list
-from crawler import crawl, crawl_users, get_posts, add_comments
+from crawler import crawl, crawl_users, get_posts, add_comments, add_likers
 import pathlib
 
 from instagram_private_api import (
@@ -56,6 +56,10 @@ if __name__ == '__main__':
             target_path_for_profiles = f"{raw_path}_profiles.json"
         _ = crawl_users(api, user_ids, target_path_for_profiles, config)
     if "get_comments" in args.tasks:
-        raw_data_with_comments = add_comments(api, raw_data, config)
+        raw_data = add_comments(api, raw_data, config)
         with open(f"{raw_path}_comments.json", "w", encoding="utf-8") as f:
+            json.dump(raw_data, f, indent=2, ensure_ascii=False)
+    if "get_likers" in args.tasks:
+        raw_data = add_likers(api, raw_data, config)
+        with open(f"{raw_path}_likers.json", "w", encoding="utf-8") as f:
             json.dump(raw_data, f, indent=2, ensure_ascii=False)
